@@ -5,7 +5,7 @@ from django.urls import reverse
 from django.contrib.auth.models import User
 from .models import Student, Warden, DailyBill, Mess
 from django.utils import timezone
-from datetime import date
+from datetime import datetime
 
 def index(request):
     return render(request, 'mess/index.html', {'error_msg': False})
@@ -98,16 +98,65 @@ def mess(request, mess):
 
 def update(request, mess):
     messx = get_object_or_404(Mess, mess_name = mess)
-    warden = get_object_or_404(Warden, name = messx.warden_id)
+    warden = get_object_or_404(Warden, name = str(messx.warden_id))
     messx.breakfast_rate  = request.POST['bname']
     messx.lunch_rate = request.POST['lname']
     messx.dinner_rate = request.POST['dname']
     messx.extras_rate_breakfast = request.POST['bxname']
     messx.extras_rate_lunch = request.POST['exname']
     messx.extra_rate_dinner = request.POST['dxname'] 
-    messx.date = date.today
+    t = timezone.now()
+    date_today = t.strftime("%Y-%m-%d")
+    messx.date = date_today
     messx.save()
     return HttpResponseRedirect(reverse('mess:wardenpage', args=(warden.warden_id,)))
+
+def attendence(request, mess):
+    mess_record = get_object_or_404(Mess, mess_name = mess)
+    context = {
+        'mess_record': mess_record,
+    }
+    return render(request, 'mess/attendence.html', context)
+
+def updateattendence(request, mess):
+    messx = get_object_or_404(Mess, mess_name = mess)
+    warden = get_object_or_404(Warden, name = str(messx.warden_id))
+    student_id = request.POST["stno"]
+    extras = request.POST["extras"]
+    student = get_object_or_404(Student, student_id = student_id)
+    t = timezone.now()
+    date_today = t.strftime("%Y-%m-%d")
+    try:
+        dailybill = student.dailybill_set.get(date = date_today)
+    except DailyBill.DoesNotExist:
+        dailybill = DailyBill(student=student)
+    finally:
+        bill = 0
+        if str(student.mess) == str(mess):
+            cur_time = datetime.now().hour
+            dailybill.date = date_today
+            if int(cur_time) >= 7 and int(cur_time) <= 9 and dailybill.breakfast is False:
+                print("1")
+                dailybill.breakfast = True
+                dailybill.extras_breakfast = extras
+                bill += messx.breakfast_rate + (extras*messx.extras_rate_breakfast)
+                dailybill.save()
+            elif int(cur_time) >= 12 and int(cur_time) <= 14 and dailybill.lunch is False:
+                print("2")
+                dailybill.lunch = True
+                dailybill.extras_lunch += extras
+                bill += messx.lunch_rate + (extras*messx.extras_rate_lunch)
+                dailybill.save()
+            elif int(cur_time) >= 19 and int(cur_time) <= 21 and dailybill.dinner is False:
+                print("3")
+                dailybill.lunch = True
+                dailybill.extras_lunch = extras
+                bill += messx.dinner_rate + (extras*messx.extras_rate_dinner)
+                dailybill.save()
+        student.total_bill += bill
+        student.save()
+        return HttpResponseRedirect(reverse('mess:wardenpage', args=(warden.warden_id,)))
+
 
 def logout_view(request, id):
     logout(request)

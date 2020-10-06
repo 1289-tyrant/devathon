@@ -54,6 +54,10 @@
     <input type="text" id="dxname" name="dxname" value={{mess_record.extras_rate_dinner}}><br><br>
     <input type="submit" value="Submit">
   </form>
+  <form action="{% url 'mess:attendence' mess_record.mess_name%}" method="POST">
+    {% csrf_token %}
+    <input type="submit" value="attendence">
+  </form>
 </div>
 
  </div>
